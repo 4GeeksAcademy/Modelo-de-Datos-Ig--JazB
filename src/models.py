@@ -1,74 +1,114 @@
-from flask_sqlalchemy import SQLAlchemy
+import os
+import sys
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, UniqueConstraint
+from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy import Enum as SQLEnum
+from enum import Enum
+from eralchemy2 import render_er
+from datetime import datetime
 
-db = SQLAlchemy()
-
-# USERS
+Base = declarative_base()
 
 
-class User(db.Model):
+# USUARIOS
+
+
+class User(Base):
     __tablename__ = "user"
 
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    firstname = db.Column(db.String(50), nullable=False)
-    lastname = db.Column(db.String(50), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    id = Column(Integer, primary_key=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    firstname = Column(String(50), nullable=False)
+    lastname = Column(String(50), nullable=False)
+    email = Column(String(120), unique=True, nullable=False, index=True)
+    password = Column(String(200), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    posts = db.relationship("Post", backref="author", lazy=True)
-    comments = db.relationship("Comment", backref="author", lazy=True)
-    likes = db.relationship("Like", backref="user", lazy=True)
+    # Relaciones
+    posts = relationship("Post", backref="author",
+                         lazy=True, cascade="all, delete-orphan")
+    comments = relationship("Comment", backref="author",
+                            lazy=True, cascade="all, delete-orphan")
+    likes = relationship("Like", backref="user", lazy=True,
+                         cascade="all, delete-orphan")
 
 
-# FOLLOWERS
-class Follow(db.Model):
+# RELACIÓN FOLLOWERS
+class Follow(Base):
     __tablename__ = "follow"
 
-    id = db.Column(db.Integer, primary_key=True)
-    follower_id = db.Column(
-        db.Integer, db.ForeignKey("user.id"), nullable=False)
-    followed_id = db.Column(
-        db.Integer, db.ForeignKey("user.id"), nullable=False)
+    id = Column(Integer, primary_key=True)
+    follower_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    followed_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+
+    __table_args__ = (UniqueConstraint(
+        "follower_id", "followed_id", name="unique_follow"),)
 
 
 # POSTS
-class Post(db.Model):
+class Post(Base):
     __tablename__ = "post"
 
-    id = db.Column(db.Integer, primary_key=True)
-    caption = db.Column(db.String(500))
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    id = Column(Integer, primary_key=True)
+    caption = Column(String(500))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
 
-    media = db.relationship("Media", backref="post", lazy=True)
-    comments = db.relationship("Comment", backref="post", lazy=True)
-    likes = db.relationship("Like", backref="post", lazy=True)
+    # Relaciones
+    media = relationship("Media", backref="post", lazy=True,
+                         cascade="all, delete-orphan")
+    comments = relationship("Comment", backref="post",
+                            lazy=True, cascade="all, delete-orphan")
+    likes = relationship("Like", backref="post", lazy=True,
+                         cascade="all, delete-orphan")
 
 
-#  MEDIA
-class Media(db.Model):
+# TIPOS DE MEDIA
+class MediaType(Enum):
+    IMAGE = "image"
+    VIDEO = "video"
+
+
+# MEDIA
+class Media(Base):
     __tablename__ = "media"
 
-    id = db.Column(db.Integer, primary_key=True)
-    type = db.Column(db.String(20), nullable=False)  # "image" o "video"
-    url = db.Column(db.String(250), nullable=False)
-    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    id = Column(Integer, primary_key=True)
+    type = Column(SQLEnum(MediaType), nullable=False)
+    url = Column(String(250), nullable=False)
+    post_id = Column(Integer, ForeignKey("post.id"), nullable=False)
 
 
-#  COMMENTS
-class Comment(db.Model):
+# COMENTARIOS
+class Comment(Base):
     __tablename__ = "comment"
 
-    id = db.Column(db.Integer, primary_key=True)
-    text = db.Column(db.String(500), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    id = Column(Integer, primary_key=True)
+    text = Column(String(500), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    post_id = Column(Integer, ForeignKey("post.id"), nullable=False)
 
 
-#  LIKES
-class Like(db.Model):
+# LIKES
+class Like(Base):
     __tablename__ = "like"
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    post_id = Column(Integer, ForeignKey("post.id"), nullable=False)
+
+    __table_args__ = (UniqueConstraint(
+        "user_id", "post_id", name="unique_like"),)
+
+
+# GENERAR DIAGRAMA
+
+def to_dict(self):
+    return {}
+
+
+render_er(Base, "diagram.png")
+
